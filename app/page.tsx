@@ -260,7 +260,7 @@ export default function Dashboard() {
               fontWeight: "900",
               color: "var(--success)"
             }}>
-              Weekly Investment: R{fullPlan.totalCost.toFixed(2)}
+              Weekly Investment: R{fullPlan.totalCost.toFixed(2)} / R2800
             </div>
           </section>
 

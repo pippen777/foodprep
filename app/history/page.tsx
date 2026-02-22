@@ -105,7 +105,7 @@ export default function HistoryPage() {
                                     </div>
                                     <div style={{ textAlign: "right" }}>
                                         <div style={{ fontSize: "1.8rem", fontWeight: "900", color: "var(--success)" }}>
-                                            R{plan.totalCost.toFixed(2)}
+                                            R{plan.totalCost.toFixed(2)} / R2800
                                         </div>
                                         <button
                                             onClick={() => setViewingShoppingList(shoppingList)}
