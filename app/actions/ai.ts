@@ -11,6 +11,11 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
 
   const dietMode = settingsMap.diet_mode || "Carb-Cycling";
   const meals = await prisma.meal.findMany();
+
+  if (meals.length === 0) {
+    return { success: false, error: "Your library is empty. Add some meals first!" };
+  }
+
   const ingredients = await prisma.ingredient.findMany();
   const lowRatedMeals = meals.filter(m => m.rating < 3).map(m => m.name);
   const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price }));
@@ -21,6 +26,8 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
     tags: m.tags,
     cost: m.cost
   }));
+
+  console.log(`[AI Planner] Generating ${days} days... Library Size: ${meals.length}`);
 
   const systemPrompt = `
     You are "Food Crib AI", a family meal planner. Target: 2 adults, one 4-year-old in South Africa.
