@@ -98,12 +98,26 @@ export async function sendPrompt(prompt: string, systemPrompt?: string): Promise
         }
     };
 
+    const cleanContent = (content: string) => {
+        // Find the first occurrence of '{' or '[' and the last occurrence of '}' or ']'
+        const start = Math.min(
+            content.indexOf("{") === -1 ? Infinity : content.indexOf("{"),
+            content.indexOf("[") === -1 ? Infinity : content.indexOf("[")
+        );
+        const end = Math.max(
+            content.lastIndexOf("}"),
+            content.lastIndexOf("]")
+        );
+
+        if (start !== Infinity && end !== -1 && end > start) {
+            return content.substring(start, end + 1);
+        }
+        return content.trim();
+    };
+
     try {
         let content = await callApi(model);
-        if (content.includes("```")) {
-            content = content.replace(/```[a-z]*\n/g, "").replace(/\n```/g, "").trim();
-        }
-        return content;
+        return cleanContent(content);
     } catch (error) {
         console.error(`Primary model [${model}] failed:`, (error as Error).message);
 
@@ -113,10 +127,7 @@ export async function sendPrompt(prompt: string, systemPrompt?: string): Promise
             console.log(`Attempting Fallback: ${fb}...`);
             try {
                 let content = await callApi(fb);
-                if (content.includes("```")) {
-                    content = content.replace(/```[a-z]*\n/g, "").replace(/\n```/g, "").trim();
-                }
-                return content;
+                return cleanContent(content);
             } catch (fbError) {
                 lastError = (fbError as Error).message;
                 console.error(`Fallback [${fb}] failed:`, lastError);
