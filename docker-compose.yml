@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  foodprep:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: foodprep
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/foodprep.db
+    volumes:
+      - ./data:/app/data
+    restart: always
+
+volumes:
+  data:
