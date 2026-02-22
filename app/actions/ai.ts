@@ -22,13 +22,16 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
     Diet Mode: ${dietMode} (Carb-Cycling: carbs at lunch, low-carb dinner. Keto: zero starch).
     Cooking: 15-min active prep, Air Fryer/Oven preferred. Slow cooker max once a week.
     
-    ${mealType === 'lunch' ? 'FOCUS: Generate ONLY LUNCHES.' : ''}
-    ${mealType === 'dinner' ? 'FOCUS: Generate ONLY DINNERS.' : ''}
+    ${mealType === 'lunch' ? 'FOCUS: Generate ONLY LUNCHES. In the JSON, the "dinner" key MUST be null for every day.' : ''}
+    ${mealType === 'dinner' ? 'FOCUS: Generate ONLY DINNERS. In the JSON, the "lunch" key MUST be null for every day.' : ''}
+    ${mealType === 'all' ? 'Include both lunch and dinner.' : ''}
 
-    STRICT RULE: Prioritize using meals from the "Current Library Meals" list below. If the library is insufficient, generate new meals that fit the criteria.
+    STRICTEST RULE: You are ONLY allowed to use meals from the "Current Library Meals" list below. 
+    STRICT ZERO TOLERANCE for generating new or outside meals. 
+    If you reach the end of the list, REPEAT meals from the library rather than creating new ones.
     
     Ingredient Inventory (for pricing context selection): ${JSON.stringify(ingredientContext)}
-    Current Library Meals: ${JSON.stringify(ratedMeals.map(m => ({ id: m.id, name: m.name, tags: m.tags, cost: m.cost, ingredients: m.ingredients, instructions: m.instructions })))}
+    Current Library Meals (META-ONLY): ${JSON.stringify(meals.map(m => ({ id: m.id, name: m.name, tags: m.tags, cost: m.cost, ingredients: JSON.parse(m.ingredients).map((i: any) => ({ item: i.item, amount: i.amount })) })))}
     NEVER suggest (Low Rated): ${lowRatedMeals.join(", ")}
     STRICT INGREDIENT EXCLUSIONS (Do not use these): ${settingsMap.exclusions || 'None'}
     
@@ -37,8 +40,8 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
       "meals": [
         {
           "day": 1,
-          "lunch": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "..." },
-          "dinner": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "..." },
+          "lunch": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "FULL INSTRUCTIONS FROM LIBRARY" },
+          "dinner": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "FULL INSTRUCTIONS FROM LIBRARY" },
           "totalCost": 0
         }
       ],
@@ -47,6 +50,8 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
       ],
       "totalWeeklyCost": 0
     }
+    
+    IMPORTANT: For each chosen meal, you MUST include its full instructions and ingredients exactly as they exist in the library.
   `;
 
   try {

@@ -58,7 +58,7 @@ export async function sendPrompt(prompt: string, systemPrompt?: string): Promise
 
     const callApi = async (targetModel: string) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout per try
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // Increased to 45s for complex plans
 
         try {
             const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
