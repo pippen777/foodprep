@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { searchMealOptions } from "@/app/actions/ai";
 import MealDetail from "@/app/library/MealDetail";
 
@@ -11,6 +11,21 @@ export default function FindMealClient() {
     const [selectedMeal, setSelectedMeal] = useState<any | null>(null);
     const [savedMeals, setSavedMeals] = useState<number[]>([]);
     const [error, setError] = useState("");
+    
+    // Mission Control State
+    const [missionLogs, setMissionLogs] = useState<string[]>([]);
+    const [progress, setProgress] = useState(0);
+    const logEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (logEndRef.current) {
+            logEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [missionLogs]);
+
+    const addLog = (text: string) => {
+        setMissionLogs(prev => [...prev, `[${new Date().toLocaleTimeString([], { hour12: false, second: '2-digit', minute: '2-digit' })}] ${text}`]);
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,11 +35,44 @@ export default function FindMealClient() {
         setError("");
         setOptions([]);
         setSavedMeals([]);
+        setMissionLogs([]);
+        setProgress(0);
+
+        const stages = [
+            { msg: "Handshaking with OpenRouter Neural Core...", progress: 5, delay: 500 },
+            { msg: "Scanning South African ingredient pricing database...", progress: 15, delay: 1500 },
+            { msg: "Analyzing diet mode constraints & exclusions...", progress: 25, delay: 3000 },
+            { msg: "Generating 4 recipe variations...", progress: 40, delay: 6000 },
+            { msg: "Primary Model processing request...", progress: 55, delay: 10000 },
+            { msg: "Validating recipe integrity & hallucination check...", progress: 70, delay: 18000 },
+            { msg: "Compiling cost estimates in ZAR...", progress: 85, delay: 25000 },
+            { msg: "Finalizing meal dossier...", progress: 95, delay: 35000 },
+        ];
+
+        addLog(`INITIATING DEEP SCAN FOR: "${query}"...`);
+
+        stages.forEach(s => {
+            setTimeout(() => {
+                if (loading) {
+                    addLog(s.msg);
+                    setProgress(s.progress);
+                }
+            }, s.delay);
+        });
+
+        const fallbackTimer = setTimeout(() => {
+            addLog("WARNING: Primary Node Slow. Activating Fallback Layer...");
+        }, 40500);
 
         const res = await searchMealOptions(query);
+        clearTimeout(fallbackTimer);
+
         if (res.success) {
+            setProgress(100);
+            addLog("SCAN COMPLETE. TARGETS ACQUIRED.");
             setOptions(res.options);
         } else {
+            addLog(`CRITICAL ERROR: ${res.error}`);
             setError(res.error || "Search failed");
         }
         setLoading(false);
@@ -148,20 +196,47 @@ export default function FindMealClient() {
             </div>
 
             {loading && (
-                <div style={{ textAlign: "center", padding: "8rem" }}>
-                    <div className="spinner" style={{
-                        width: "50px",
-                        height: "50px",
-                        border: "3px solid rgba(255,255,255,0.1)",
-                        borderTopColor: "var(--primary)",
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                        margin: "0 auto 2rem auto"
-                    }}></div>
-                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "1.2rem", fontWeight: "300" }}>Syncing with global culinary nodes...</p>
-                    <style jsx>{`
-                        @keyframes spin { to { transform: rotate(360deg); } }
-                    `}</style>
+                <div style={{ 
+                    maxWidth: "700px", 
+                    margin: "0 auto", 
+                    background: "rgba(0,0,0,0.4)", 
+                    borderRadius: "var(--radius-lg)", 
+                    padding: "2rem",
+                    border: "1px solid rgba(255,255,255,0.1)"
+                }}>
+                    <div style={{ marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                            <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "1px" }}>Mission Progress</span>
+                            <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: "800" }}>{progress}%</span>
+                        </div>
+                        <div style={{ height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", overflow: "hidden" }}>
+                            <div style={{ 
+                                height: "100%", 
+                                width: `${progress}%`, 
+                                background: "linear-gradient(90deg, var(--primary), var(--accent))",
+                                transition: "width 0.3s ease"
+                            }}></div>
+                        </div>
+                    </div>
+                    
+                    <div style={{ 
+                        fontFamily: "monospace", 
+                        fontSize: "0.85rem", 
+                        color: "rgba(255,255,255,0.7)",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        background: "rgba(0,0,0,0.3)",
+                        padding: "1rem",
+                        borderRadius: "var(--radius-sm)"
+                    }}>
+                        {missionLogs.map((log, idx) => (
+                            <div key={idx} style={{ marginBottom: "0.25rem" }}>
+                                <span style={{ color: "var(--primary)" }}>{log.split(']')[0]}]</span>
+                                <span>{log.split(']')[1]}</span>
+                            </div>
+                        ))}
+                        <div ref={logEndRef} />
+                    </div>
                 </div>
             )}
 
@@ -175,7 +250,10 @@ export default function FindMealClient() {
                 <MealDetail
                     meal={{
                         ...selectedMeal,
-                        ingredients: JSON.stringify(selectedMeal.ingredients)
+                        ingredients: JSON.stringify(selectedMeal.ingredients),
+                        instructions: Array.isArray(selectedMeal.instructions) 
+                            ? selectedMeal.instructions.join("\n") 
+                            : selectedMeal.instructions
                     }}
                     onClose={() => setSelectedMeal(null)}
                     onSaveSuccess={() => handleMealSaved(selectedMeal.optionIndex)}

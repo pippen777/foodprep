@@ -369,6 +369,7 @@ export default function Dashboard() {
                 >&times;</button>
 
                 <h2 style={{ fontSize: "2.5rem", marginBottom: "2rem" }}>Logistics Manifest</h2>
+                
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
                   {plan.shoppingList?.map((item: any, idx: number) => (
                     <div key={idx} style={{
@@ -383,16 +384,98 @@ export default function Dashboard() {
                         <span style={{ fontWeight: "700", display: "block" }}>{item.item}</span>
                         <span style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Qty: {item.amount}</span>
                       </div>
-                      <div style={{ color: "var(--success)", fontWeight: "800" }}>R{item.estimatedCost}</div>
+                      <div style={{ color: "var(--success)", fontWeight: "800" }}>R{item.estimatedCost || 0}</div>
                     </div>
                   ))}
                 </div>
+                
+                <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", justifyContent: "space-between", fontSize: "1.2rem", fontWeight: "bold" }}>
+                  <span>Total Estimated Cost:</span>
+                  <span style={{ color: "var(--success)" }}>R{plan.totalCost || 0}</span>
+                </div>
+
+                <div style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
+                  <button
+                    onClick={() => {
+                      document.querySelector('.shopping-print-container')?.setAttribute('style', 'display: block !important');
+                      setTimeout(() => {
+                        window.print();
+                        document.querySelector('.shopping-print-container')?.setAttribute('style', 'display: none !important');
+                      }, 100);
+                    }}
+                    className="btn-primary"
+                    style={{ flex: 1 }}
+                  >
+                    🖨️ Print
+                  </button>
+                  <button
+                    onClick={() => {
+                      const maxItemLen = Math.max(...(plan.shoppingList?.map((i: any) => i.item.length) || [10]));
+                      const padLen = Math.min(maxItemLen + 2, 30);
+                      
+                      const lines = plan.shoppingList?.map((item: any) => {
+                        const name = item.item.padEnd(padLen);
+                        const qty = String(item.amount).slice(0, 15).padEnd(15);
+                        const cost = `R${(item.estimatedCost || 0).toFixed(2)}`;
+                        return `${name} ${qty}  ${cost}`;
+                      }) || [];
+                      
+                      const totalLine = "=".repeat(padLen + 20);
+                      const sumLine = "TOTAL".padEnd(padLen) + "                " + `R${(plan.totalCost || 0).toFixed(2)}`;
+                      
+                      const text = `SHOPPING LIST\n${"=".repeat(40)}\n\nItem${" ".repeat(padLen - 4)}Quantity            Cost\n${"-".repeat(40)}\n${lines.join('\n')}\n${totalLine}\n${sumLine}\n${"=".repeat(padLen + 20)}\n`;
+                      
+                      const blob = new Blob([text], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'shopping-list.txt';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn-secondary"
+                    style={{ flex: 1, borderColor: "var(--success)", color: "var(--success)" }}
+                  >
+                    📥 Save as Text
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    const printContent = `
+                      <html>
+                      <head><title>Shopping List</title></head>
+                      <body style="font-family: Arial, sans-serif; padding: 20px;">
+                      <h1 style="border-bottom: 2px solid #333; padding-bottom: 10px;">Shopping List</h1>
+                      <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid #ccc;">
+                          <th style="text-align: left; padding: 8px;">Item</th>
+                          <th style="text-align: left; padding: 8px;">Quantity</th>
+                          <th style="text-align: right; padding: 8px;">Cost</th>
+                        </tr>
+                        ${(plan.shoppingList || []).map((item: any) => `
+                        <tr style="border-bottom: 1px solid #eee;">
+                          <td style="padding: 8px;">${item.item}</td>
+                          <td style="padding: 8px;">${item.amount}</td>
+                          <td style="text-align: right; padding: 8px;">R${(item.estimatedCost || 0).toFixed(2)}</td>
+                        </tr>`).join('')}
+                      </table>
+                      <h2 style="margin-top: 20px; border-top: 2px solid #333; padding-top: 10px;">
+                        Total: R${(plan.totalCost || 0).toFixed(2)}
+                      </h2>
+                      </body></html>`;
+                    
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(printContent);
+                      printWindow.document.close();
+                      printWindow.print();
+                    }
+                  }}
                   className="btn-primary"
-                  style={{ marginTop: "2rem", width: "100%" }}
+                  style={{ marginTop: "1rem", width: "100%" }}
                 >
-                  🖨️ Print Manifest
+                  🖨️ Print / Save as PDF
                 </button>
               </div>
             </div>

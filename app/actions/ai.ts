@@ -77,7 +77,8 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
         return {
           ...meal,
           ingredients: JSON.parse(dbMeal.ingredients),
-          instructions: dbMeal.instructions
+          instructions: dbMeal.instructions,
+          cost: dbMeal.cost
         };
       };
 
@@ -88,7 +89,49 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
       };
     });
 
-    const finalPlan = { ...plan, meals: finalMeals };
+    // Properly aggregate shopping list from actual meal ingredients
+    const ingredientMap = new Map();
+    
+    for (const day of finalMeals) {
+      for (const mealType of ['lunch', 'dinner']) {
+        const meal = day[mealType];
+        if (meal && meal.ingredients) {
+          for (const ing of meal.ingredients) {
+            const key = ing.item.toLowerCase();
+            if (ingredientMap.has(key)) {
+              const existing = ingredientMap.get(key);
+              existing.amount += ` + ${ing.amount}`;
+              existing.cost += ing.cost || 0;
+            } else {
+              ingredientMap.set(key, {
+                item: ing.item,
+                amount: ing.amount,
+                cost: ing.cost || 0
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const aggregatedShoppingList = Array.from(ingredientMap.values()).map(item => ({
+      item: item.item,
+      amount: item.amount,
+      estimatedCost: Math.round(item.cost * 100) / 100
+    }));
+
+    const totalWeeklyCost = finalMeals.reduce((sum: number, day: any) => {
+      const lunchCost = day.lunch?.cost || 0;
+      const dinnerCost = day.dinner?.cost || 0;
+      return sum + lunchCost + dinnerCost;
+    }, 0);
+
+    const finalPlan = { 
+      ...plan, 
+      meals: finalMeals,
+      shoppingList: aggregatedShoppingList,
+      totalWeeklyCost: Math.round(totalWeeklyCost * 100) / 100
+    };
 
     // Save to History
     await prisma.mealPlan.create({
@@ -199,11 +242,18 @@ export async function searchMealOptions(query: string) {
   const ingredients = await prisma.ingredient.findMany();
   const meals = await prisma.meal.findMany();
   const topRated = meals.filter(m => m.rating >= 4).map(m => m.name);
-  const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price, unit: i.unit }));
+  const ingredientContext = ingredients.slice(0, 200).map((i: any) => ({ name: i.name.toLowerCase(), price: i.price, unit: i.unit }));
 
   const systemPrompt = `
     You are the "Food Crib Lead Researcher". The user wants to find: "${query}".
     Provide 4 distinct variations of this meal.
+    
+    CRITICAL: PORTION SIZES - This recipe is for 2 ADULTS and 1 CHILD (age 4). Scale portions accordingly:
+    - Adult main protein: 150-200g raw weight per person
+    - Child portion: roughly half adult portion (75-100g)
+    - Vegetables: 150-200g per adult, 75-100g per child
+    - Total recipe should serve 2.5 people
+
     Selection Criteria:
     1. Budget Friendly (Maximize value/bulk ingredients).
     2. Fast & Easy (Focus on prep time under 15 mins).
@@ -212,8 +262,32 @@ export async function searchMealOptions(query: string) {
     
     Context:
     - Current Library Favorites (highly rated): ${topRated.join(", ")}
-    - Ingredient Pricing Context: ${JSON.stringify(ingredientContext)}
+    - EXACT Ingredient Pricing from database (ZAR) - DO NOT GUESS:
+    ${JSON.stringify(ingredientContext)}
     - STRICT INGREDIENT EXCLUSIONS (Do not use these): ${await getSetting('exclusions') || 'None'}
+    - NEVER include non-food items: pet food, dog food, cat food, knife, fork, spoon, plate, bowl, utensils
+    
+    COST RULES:
+    1. ONLY use prices from the database list for main ingredients (meats, vegetables, dairy)
+    2. Use SUBSTITUTE PRICING for similar items when exact match not found:
+       - Greek Yogurt / Nonfat → use Yogurt price
+       - Taco Seasoning → use Seasoning price
+       - Pizza Sauce → use Pasta Sauce or Canned Tomatoes price
+       - Parmesan (grated) → use Parmesan Cheese price
+       - Mozzarella / Cheddar / Feta → use that cheese price or generic Cheese
+       - Tortilla / Wrap → use Tortilla price
+       - Rice (any type) → use Rice price
+       - Ground Beef / Mince → use Beef Mince price
+       - Chicken Thigh/Breast → use Chicken price
+       - Zucchini → use Cucumber price
+       - Oat Flour → use Flour price
+       - Shredded Lettuce → use Lettuce price
+       - Fresh Berries → use Frozen Berries price
+    3. PANTRY STAPLES (always R0.10): salt, pepper, paprika, cumin, oregano, basil, thyme, rosemary, cinnamon, nutmeg, chili, cayenne, turmeric, curry, mixed herbs, olive oil, butter, garlic, onion, soy sauce, vinegar, stock, bay leaves, mustard, mayonnaise, tomato paste, maple syrup, BBQ sauce, ketchup, hot sauce, sesame seeds, baking powder, vanilla, cocoa, honey
+    4. EXCLUDE NON-FOOD: parchment paper, aluminum foil, protein powder, supplements
+    5. These pantry staples still appear on shopping list but are R0.10 each
+    6. If ingredient NOT in database (and not pantry staple), set cost to 0 and add "(PRICE UNKNOWN)" to item name
+    7. Calculate: cost = (quantity_in_g / 1000) * price_per_kg OR (quantity_in_ml / 1000) * price_per_litre
     
     Return ONLY a JSON array of 4 objects:
     [
@@ -240,7 +314,6 @@ export async function searchMealOptions(query: string) {
 export async function recalculateCosts(mealIngredients: any[]) {
   const dbIngredients = await prisma.ingredient.findMany();
 
-  // Only send pricing context for ingredients that are similar to what's in the meal
   const relevantPricing = dbIngredients.filter(db =>
     mealIngredients.some(mi => mi.item.toLowerCase().includes(db.name.toLowerCase()) || db.name.toLowerCase().includes(mi.item.toLowerCase()))
   ).slice(0, 100);
@@ -249,13 +322,28 @@ export async function recalculateCosts(mealIngredients: any[]) {
     You are a Cost Estimator. Update the 'cost' field for each ingredient provided based on this pricing context (ZAR):
     ${JSON.stringify(relevantPricing.map(i => ({ name: i.name, price: i.price, unit: i.unit })))}
     
-    Return ONLY a JSON array of ingredient objects with the updated costs.
-    Keep the original 'item' and 'amount' fields exactly as they are.
+    Return ONLY a valid JSON array of ingredient objects. Keep the original 'item' and 'amount' fields exactly as they are.
+    Example: [{"item": "Chicken", "amount": "500g", "cost": 50}]
   `;
 
   try {
     const response = await sendPrompt(`Recalculate costs for: ${JSON.stringify(mealIngredients)}`, systemPrompt);
-    return { success: true, ingredients: JSON.parse(response) };
+    
+    // Try to fix JSON if slightly malformed
+    let parsed;
+    try {
+      parsed = JSON.parse(response);
+    } catch {
+      // Try to find JSON array in response
+      const match = response.match(/\[[\s\S]*\]/);
+      if (match) {
+        parsed = JSON.parse(match[0]);
+      } else {
+        throw new Error("Invalid JSON response");
+      }
+    }
+    
+    return { success: true, ingredients: parsed };
   } catch (error) {
     return { success: false, error: (error as Error).message };
   }

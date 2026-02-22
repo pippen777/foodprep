@@ -34,6 +34,7 @@ export default function Navigation() {
                     { label: "Planner", href: "/planner" },
                     { label: "Discover", href: "/find" },
                     { label: "Library", href: "/library" },
+                    { label: "Import", href: "/importer" },
                     { label: "Inventory", href: "/inventory" },
                     { label: "History", href: "/history" },
                     { label: "Settings", href: "/settings" }

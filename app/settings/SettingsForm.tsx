@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { saveSettings, fetchOpenRouterModels } from "@/app/actions/settings";
+import { recalculateAllMealPrices, convertAllMeasurements } from "@/app/actions/meals";
 
 interface SettingsFormProps {
     initialSettings: Record<string, string>;
@@ -30,6 +31,36 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     const [loadingModels, setLoadingModels] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
+    const [recalculating, setRecalculating] = useState(false);
+    const [recalcResult, setRecalcResult] = useState<{success: boolean, updated: number, estimated: {name: string, price: number}[], missing: string[]} | null>(null);
+    const [converting, setConverting] = useState(false);
+    const [convResult, setConvResult] = useState<{success: boolean, updated: number, error?: string} | null>(null);
+
+    const handleConvertMeasurements = async () => {
+        setConverting(true);
+        setConvResult(null);
+        try {
+            const result = await convertAllMeasurements();
+            setConvResult({ success: result.success, updated: result.updated || 0, error: result.error });
+        } catch (error) {
+            setConvResult({ success: false, updated: 0, error: (error as Error).message });
+        } finally {
+            setConverting(false);
+        }
+    };
+
+    const handleRecalculatePrices = async () => {
+        setRecalculating(true);
+        setRecalcResult(null);
+        try {
+            const result = await recalculateAllMealPrices();
+            setRecalcResult(result);
+        } catch (error) {
+            setRecalcResult({ success: false, updated: 0, estimated: [], missing: [(error as Error).message] });
+        } finally {
+            setRecalculating(false);
+        }
+    };
 
     const handleFetchModels = async () => {
         setLoadingModels(true);
@@ -195,6 +226,61 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
             >
                 {saving ? "Syncing..." : "Commit Configuration"}
             </button>
+
+            <div style={{ marginTop: "3rem", paddingTop: "2rem", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem" }}>Kitchen Utilities</h3>
+                <button
+                    type="button"
+                    onClick={handleConvertMeasurements}
+                    disabled={converting}
+                    className="btn-secondary"
+                    style={{ width: "100%", padding: "1rem", fontSize: "1rem", borderColor: "var(--accent)", color: "var(--accent)", marginBottom: "1rem" }}
+                >
+                    {converting ? "Converting measurements to metric..." : "Convert All Measurements to Metric (SA)"}
+                </button>
+                {convResult && (
+                    <div style={{ marginBottom: "1.5rem", padding: "1rem", background: convResult.success ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)", borderRadius: "var(--radius-sm)", fontSize: "0.9rem" }}>
+                        <p style={{ color: convResult.success ? "var(--success)" : "var(--error)" }}>
+                            {convResult.success ? `Converted ${convResult.updated} meals to metric measurements` : `Error: ${convResult.error || "Conversion failed"}`}
+                        </p>
+                    </div>
+                )}
+                <button
+                    type="button"
+                    onClick={handleRecalculatePrices}
+                    disabled={recalculating}
+                    className="btn-secondary"
+                    style={{ width: "100%", padding: "1rem", fontSize: "1rem", borderColor: "var(--primary)", color: "var(--primary)" }}
+                >
+                    {recalculating ? "Recalculating all meal prices..." : "Recalculate All Meal Prices from Database"}
+                </button>
+                {recalcResult && (
+                    <div style={{ marginTop: "1rem", padding: "1rem", background: "rgba(16, 185, 129, 0.1)", borderRadius: "var(--radius-sm)", fontSize: "0.9rem" }}>
+                        <p style={{ color: "var(--success)", marginBottom: "0.5rem" }}>Updated {recalcResult.updated} meals.</p>
+                        {recalcResult.estimated && recalcResult.estimated.length > 0 && (
+                            <div style={{ marginBottom: "1rem" }}>
+                                <p style={{ color: "var(--primary)", marginBottom: "0.5rem" }}>AI estimated prices for {recalcResult.estimated.length} new ingredients:</p>
+                                <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "rgba(255,255,255,0.7)", fontSize: "0.8rem" }}>
+                                    {recalcResult.estimated.map((item, i) => (
+                                        <li key={i}>{item.name}: R{item.price.toFixed(2)}/kg</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {recalcResult.missing && recalcResult.missing.length > 0 && (
+                            <div>
+                                <p style={{ color: "var(--accent)", marginBottom: "0.5rem" }}>Still missing prices for {recalcResult.missing.length} ingredients:</p>
+                                <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "rgba(255,255,255,0.6)", fontSize: "0.8rem" }}>
+                                    {[...new Set(recalcResult.missing)].slice(0, 15).map((item, i) => (
+                                        <li key={i}>{item}</li>
+                                    ))}
+                                    {recalcResult.missing.length > 15 && <li>...and {recalcResult.missing.length - 15} more</li>}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {message && (
                 <p style={{

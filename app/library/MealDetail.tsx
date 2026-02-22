@@ -56,7 +56,7 @@ export default function MealDetail({ meal, onClose, onSaveSuccess }: MealDetailP
         setSaving(true);
         try {
             const totalCost = ingredients.reduce((sum, ing) => sum + (Number(ing.cost) || 0), 0);
-            await saveMeal({
+            const res = await saveMeal({
                 ...meal,
                 name,
                 instructions,
@@ -65,10 +65,15 @@ export default function MealDetail({ meal, onClose, onSaveSuccess }: MealDetailP
                 rating,
                 chefNotes,
             });
+            if (!res.success) {
+                alert("Error saving meal: " + res.error);
+                return;
+            }
             if (onSaveSuccess) onSaveSuccess();
             onClose();
         } catch (error) {
-            alert("Error saving meal");
+            console.error("Save error:", error);
+            alert("Error saving meal: " + (error as Error).message);
         } finally {
             setSaving(false);
         }
