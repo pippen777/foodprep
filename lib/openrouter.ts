@@ -57,8 +57,9 @@ export async function sendPrompt(prompt: string, systemPrompt?: string): Promise
     const FALLBACKS = ["google/gemma-3-27b-it:free", "arcee-ai/trinity-mini:free", "qwen/qwen3-4b:free"];
 
     const callApi = async (targetModel: string) => {
+        console.log(`[AI] Dispatching request to: ${targetModel}...`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // Increased to 45s for complex plans
+        const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s per try
 
         try {
             const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {

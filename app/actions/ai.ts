@@ -12,15 +12,20 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
   const dietMode = settingsMap.diet_mode || "Carb-Cycling";
   const meals = await prisma.meal.findMany();
   const ingredients = await prisma.ingredient.findMany();
-  const ratedMeals = meals.filter(m => m.rating >= 3);
   const lowRatedMeals = meals.filter(m => m.rating < 3).map(m => m.name);
-  const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price, unit: i.unit, tags: i.tags }));
+  const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price }));
+
+  // LIGHTWEIGHT CONTEXT: Only send names, tags, and costs. No instructions or objects.
+  const libraryContext = meals.map(m => ({
+    name: m.name,
+    tags: m.tags,
+    cost: m.cost
+  }));
 
   const systemPrompt = `
     You are "Food Crib AI", a family meal planner. Target: 2 adults, one 4-year-old in South Africa.
     Budget: Strictly under R400 per day.
     Diet Mode: ${dietMode} (Carb-Cycling: carbs at lunch, low-carb dinner. Keto: zero starch).
-    Cooking: 15-min active prep, Air Fryer/Oven preferred. Slow cooker max once a week.
     
     ${mealType === 'lunch' ? 'FOCUS: Generate ONLY LUNCHES. In the JSON, the "dinner" key MUST be null for every day.' : ''}
     ${mealType === 'dinner' ? 'FOCUS: Generate ONLY DINNERS. In the JSON, the "lunch" key MUST be null for every day.' : ''}
@@ -28,20 +33,20 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
 
     STRICTEST RULE: You are ONLY allowed to use meals from the "Current Library Meals" list below. 
     STRICT ZERO TOLERANCE for generating new or outside meals. 
-    If you reach the end of the list, REPEAT meals from the library rather than creating new ones.
+    If you reach the end of the list, REPEAT meals from the library.
     
-    Ingredient Inventory (for pricing context selection): ${JSON.stringify(ingredientContext)}
-    Current Library Meals (META-ONLY): ${JSON.stringify(meals.map(m => ({ id: m.id, name: m.name, tags: m.tags, cost: m.cost, ingredients: JSON.parse(m.ingredients).map((i: any) => ({ item: i.item, amount: i.amount })) })))}
+    Inventory Context: ${JSON.stringify(ingredientContext)}
+    Current Library Meals: ${JSON.stringify(libraryContext)}
     NEVER suggest (Low Rated): ${lowRatedMeals.join(", ")}
-    STRICT INGREDIENT EXCLUSIONS (Do not use these): ${settingsMap.exclusions || 'None'}
+    STRICT INGREDIENT EXCLUSIONS: ${settingsMap.exclusions || 'None'}
     
     Return ONLY a JSON object:
     {
       "meals": [
         {
           "day": 1,
-          "lunch": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "FULL INSTRUCTIONS FROM LIBRARY" },
-          "dinner": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "FULL INSTRUCTIONS FROM LIBRARY" },
+          "lunch": { "name": "MEAL_NAME_FROM_LIBRARY", "cost": 0 },
+          "dinner": { "name": "MEAL_NAME_FROM_LIBRARY", "cost": 0 },
           "totalCost": 0
         }
       ],
@@ -50,13 +55,33 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
       ],
       "totalWeeklyCost": 0
     }
-    
-    IMPORTANT: For each chosen meal, you MUST include its full instructions and ingredients exactly as they exist in the library.
   `;
 
   try {
-    const response = await sendPrompt(`Generate a ${days}-day ${mealType === 'all' ? '' : mealType + ' '}meal plan.`, systemPrompt);
-    const plan = JSON.parse(response);
+    const rawResponse = await sendPrompt(`Generate a ${days}-day ${mealType === 'all' ? '' : mealType + ' '}meal plan using MY library.`, systemPrompt);
+    const plan = JSON.parse(rawResponse);
+
+    // HYDRATION: Take the names from the AI and find the ACTUAL data in our DB
+    const finalMeals = plan.meals.map((day: any) => {
+      const hydrateMeal = (meal: any) => {
+        if (!meal || !meal.name) return null;
+        const dbMeal = meals.find(m => m.name.toLowerCase() === meal.name.toLowerCase());
+        if (!dbMeal) return null; // AI Hallucinated - filter it out or just omit details
+        return {
+          ...meal,
+          ingredients: JSON.parse(dbMeal.ingredients),
+          instructions: dbMeal.instructions
+        };
+      };
+
+      return {
+        ...day,
+        lunch: hydrateMeal(day.lunch),
+        dinner: hydrateMeal(day.dinner)
+      };
+    });
+
+    const finalPlan = { ...plan, meals: finalMeals };
 
     // Save to History
     await prisma.mealPlan.create({
@@ -64,16 +89,16 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
         startDate: new Date(),
         endDate: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
         meals: JSON.stringify({
-          meals: plan.meals,
-          shoppingList: plan.shoppingList
+          meals: finalPlan.meals,
+          shoppingList: finalPlan.shoppingList
         }),
         dietMode,
-        totalCost: plan.totalWeeklyCost,
+        totalCost: finalPlan.totalWeeklyCost,
       },
     });
 
     revalidatePath("/history");
-    return { success: true, plan };
+    return { success: true, plan: finalPlan };
   } catch (error) {
     console.error("Generation error:", error);
     return { success: false, error: (error as Error).message };
