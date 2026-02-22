@@ -14,6 +14,7 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
   const ingredients = await prisma.ingredient.findMany();
   const ratedMeals = meals.filter(m => m.rating >= 3);
   const lowRatedMeals = meals.filter(m => m.rating < 3).map(m => m.name);
+  const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price, unit: i.unit, tags: i.tags }));
 
   const systemPrompt = `
     You are "Food Crib AI", a family meal planner. Target: 2 adults, one 4-year-old in South Africa.
@@ -24,25 +25,25 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
     ${mealType === 'lunch' ? 'FOCUS: Generate ONLY LUNCHES.' : ''}
     ${mealType === 'dinner' ? 'FOCUS: Generate ONLY DINNERS.' : ''}
 
-    💸 BUDGET RULE 1: Always prioritize the most affordable option (e.g., hand-make patties from mince).
-    📦 BUDGET RULE 2 (Bulk Strategy): If buying an ingredient in bulk (e.g., 2kg-5kg chicken/mince) is 20%+ cheaper per kg than small packs, plan 2-3 different meals during the week using that same ingredient to maximize savings and reduce waste.
+    STRICT RULE: Prioritize using meals from the "Current Library Meals" list below. If the library is insufficient, generate new meals that fit the criteria.
     
-    Ingredient Inventory (for pricing context): ${JSON.stringify(ingredients.map((i: any) => ({ name: i.name, price: i.price, unit: i.unit, tags: i.tags })))}
-    Current Library Meals: ${JSON.stringify(ratedMeals.map(m => ({ name: m.name, tags: m.tags, cost: m.cost })))}
-    NEVER suggest: ${lowRatedMeals.join(", ")}
-    
-    Cravings to adapt if needed (ensure handmade version if cheaper): Burgers, Pizza, Lasagna, Meatballs, Curry, Chicken & Broccoli, Steak & Salad, Bread, Chicken Cordon Bleu, Schnitzel.
+    Ingredient Inventory (for pricing context selection): ${JSON.stringify(ingredientContext)}
+    Current Library Meals: ${JSON.stringify(ratedMeals.map(m => ({ id: m.id, name: m.name, tags: m.tags, cost: m.cost, ingredients: m.ingredients, instructions: m.instructions })))}
+    NEVER suggest (Low Rated): ${lowRatedMeals.join(", ")}
+    STRICT INGREDIENT EXCLUSIONS (Do not use these): ${settingsMap.exclusions || 'None'}
     
     Return ONLY a JSON object:
     {
       "meals": [
         {
           "day": 1,
-          ${mealType === 'all' ? '"breakfast": {"name": "...", "cost": 0},' : ''}
-          ${mealType === 'all' || mealType === 'lunch' ? '"lunch": {"name": "...", "cost": 0},' : ''}
-          ${mealType === 'all' || mealType === 'dinner' ? '"dinner": {"name": "...", "cost": 0},' : ''}
+          "lunch": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "..." },
+          "dinner": { "name": "...", "cost": 0, "ingredients": [{"item": "...", "amount": "...", "cost": 0}], "instructions": "..." },
           "totalCost": 0
         }
+      ],
+      "shoppingList": [
+        { "item": "...", "amount": "...", "estimatedCost": 0 }
       ],
       "totalWeeklyCost": 0
     }
@@ -57,7 +58,10 @@ export async function generateWeeklyPlan(days: number = 7, mealType: "lunch" | "
       data: {
         startDate: new Date(),
         endDate: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-        meals: JSON.stringify(plan.meals),
+        meals: JSON.stringify({
+          meals: plan.meals,
+          shoppingList: plan.shoppingList
+        }),
         dietMode,
         totalCost: plan.totalWeeklyCost,
       },
@@ -83,10 +87,12 @@ export async function pantryChef(ingredients: string) {
   const systemPrompt = `
     You are a Pantry Chef. Using ONLY the ingredients provided, generate a budget-friendly, macro-compliant recipe.
     Factor in diet mode and South African budget (R400/day total).
+
+    STRICT INGREDIENT EXCLUSIONS (Do not use these): ${await getSetting('exclusions') || 'None'}
     Return ONLY JSON:
     {
       "name": "...",
-      "instructions": "...",
+      "instructions": "Detailed, numbered step-by-step Execution Protocol (prep and cooking).",
       "ingredients": [{"item": "...", "amount": "..."}],
       "macros": {"calories": 0, "protein": 0, "carbs": 0, "fats": 0}
     }
@@ -106,6 +112,43 @@ export async function getMealPlans() {
   });
 }
 
+export async function getLatestMealPlan() {
+  const plan = await prisma.mealPlan.findFirst({
+    orderBy: { createdAt: "desc" },
+  });
+  if (!plan) return null;
+
+  const parsed = JSON.parse(plan.meals);
+
+  // Normalize legacy data: if parsed data is a simple array, wrap it in the new object structure
+  const mealsData = Array.isArray(parsed) ? { meals: parsed, shoppingList: [] } : parsed;
+
+  return {
+    ...plan,
+    meals: mealsData
+  };
+}
+
+export async function deleteMealPlan(id: string) {
+  await prisma.mealPlan.delete({
+    where: { id },
+  });
+  revalidatePath("/history");
+  revalidatePath("/");
+}
+
+export async function updateMealPlan(id: string, meals: any[], shoppingList: any[], totalCost: number) {
+  await prisma.mealPlan.update({
+    where: { id },
+    data: {
+      meals: JSON.stringify({ meals, shoppingList }),
+      totalCost
+    },
+  });
+  revalidatePath("/history");
+  revalidatePath("/");
+}
+
 export async function updateMealRating(mealId: string, rating: number, chefNotes?: string) {
   await prisma.meal.update({
     where: { id: mealId },
@@ -119,6 +162,7 @@ export async function searchMealOptions(query: string) {
   const ingredients = await prisma.ingredient.findMany();
   const meals = await prisma.meal.findMany();
   const topRated = meals.filter(m => m.rating >= 4).map(m => m.name);
+  const ingredientContext = ingredients.slice(0, 150).map((i: any) => ({ name: i.name, price: i.price, unit: i.unit }));
 
   const systemPrompt = `
     You are the "Food Crib Lead Researcher". The user wants to find: "${query}".
@@ -131,14 +175,15 @@ export async function searchMealOptions(query: string) {
     
     Context:
     - Current Library Favorites (highly rated): ${topRated.join(", ")}
-    - Ingredient Pricing Context: ${JSON.stringify(ingredients.map((i: any) => ({ name: i.name, price: i.price, unit: i.unit })))}
+    - Ingredient Pricing Context: ${JSON.stringify(ingredientContext)}
+    - STRICT INGREDIENT EXCLUSIONS (Do not use these): ${await getSetting('exclusions') || 'None'}
     
     Return ONLY a JSON array of 4 objects:
     [
       {
         "name": "...",
         "variation": "Budget | Fast & Easy | Gourmet | Food Crib Signature",
-        "instructions": "...",
+        "instructions": "Detailed, numbered step-by-step Execution Protocol (prep and cooking).",
         "ingredients": [{"item": "...", "amount": "...", "cost": 0}],
         "calories": 0, "protein": 0, "carbs": 0, "fats": 0,
         "tags": "...",
@@ -155,18 +200,24 @@ export async function searchMealOptions(query: string) {
   }
 }
 
-export async function recalculateCosts(ingredients: any[]) {
+export async function recalculateCosts(mealIngredients: any[]) {
   const dbIngredients = await prisma.ingredient.findMany();
+
+  // Only send pricing context for ingredients that are similar to what's in the meal
+  const relevantPricing = dbIngredients.filter(db =>
+    mealIngredients.some(mi => mi.item.toLowerCase().includes(db.name.toLowerCase()) || db.name.toLowerCase().includes(mi.item.toLowerCase()))
+  ).slice(0, 100);
+
   const systemPrompt = `
     You are a Cost Estimator. Update the 'cost' field for each ingredient provided based on this pricing context (ZAR):
-    ${JSON.stringify(dbIngredients.map(i => ({ name: i.name, price: i.price, unit: i.unit })))}
+    ${JSON.stringify(relevantPricing.map(i => ({ name: i.name, price: i.price, unit: i.unit })))}
     
     Return ONLY a JSON array of ingredient objects with the updated costs.
     Keep the original 'item' and 'amount' fields exactly as they are.
   `;
 
   try {
-    const response = await sendPrompt(`Recalculate costs for: ${JSON.stringify(ingredients)}`, systemPrompt);
+    const response = await sendPrompt(`Recalculate costs for: ${JSON.stringify(mealIngredients)}`, systemPrompt);
     return { success: true, ingredients: JSON.parse(response) };
   } catch (error) {
     return { success: false, error: (error as Error).message };

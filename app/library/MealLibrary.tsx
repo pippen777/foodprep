@@ -36,25 +36,23 @@ export default function MealLibrary({ initialMeals }: MealLibraryProps) {
     });
 
     return (
-        <div>
+        <div style={{ padding: "1rem" }}>
             {/* Search and Filters */}
-            <div style={{ marginBottom: "2rem" }}>
-                <input
-                    type="text"
-                    placeholder="Search meals or ingredients..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{
-                        width: "100%",
-                        padding: "1rem",
-                        fontSize: "1.1rem",
-                        borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--border)",
-                        backgroundColor: "var(--surface)",
-                        boxShadow: "var(--shadow-sm)",
-                        marginBottom: "1rem"
-                    }}
-                />
+            <div style={{ marginBottom: "3rem" }}>
+                <div style={{ position: "relative", marginBottom: "1.5rem" }}>
+                    <span style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", opacity: 0.5 }}>🔍</span>
+                    <input
+                        type="text"
+                        placeholder="Search your culinary archives..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={{
+                            width: "100%",
+                            padding: "1.25rem 1rem 1.25rem 3rem",
+                            fontSize: "1.1rem"
+                        }}
+                    />
+                </div>
 
                 <div style={{
                     display: "flex",
@@ -68,7 +66,12 @@ export default function MealLibrary({ initialMeals }: MealLibraryProps) {
                             key={filter}
                             onClick={() => setActiveFilter(filter)}
                             className={activeFilter === filter ? "btn-primary" : "btn-secondary"}
-                            style={{ flexShrink: 0 }}
+                            style={{
+                                flexShrink: 0,
+                                padding: "0.6rem 1.5rem",
+                                fontSize: "0.85rem",
+                                border: activeFilter === filter ? "none" : "1px solid rgba(255,255,255,0.1)"
+                            }}
                         >
                             {filter}
                         </button>
@@ -79,49 +82,57 @@ export default function MealLibrary({ initialMeals }: MealLibraryProps) {
             {/* Meal Grid */}
             <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: "2rem"
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: "2.5rem"
             }}>
                 {filteredMeals.map((meal) => (
-                    <div key={meal.id} className="card" style={{ display: "flex", flexDirection: "column" }}>
-                        <div style={{ marginBottom: "1rem" }}>
+                    <div key={meal.id} className="glass-card" style={{ display: "flex", flexDirection: "column", padding: "1.5rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
                             <span style={{
-                                fontSize: "0.8rem",
-                                backgroundColor: "var(--surface-secondary)",
-                                padding: "0.25rem 0.5rem",
+                                fontSize: "0.9rem",
+                                background: "rgba(59, 130, 246, 0.1)",
+                                padding: "0.4rem 0.8rem",
                                 borderRadius: "var(--radius-sm)",
                                 color: "var(--primary)",
-                                fontWeight: "600"
+                                fontWeight: "800",
+                                border: "1px solid rgba(59, 130, 246, 0.2)"
                             }}>
                                 R{meal.cost.toFixed(2)}
                             </span>
+                            <div style={{ color: "var(--warning)", fontSize: "1rem" }}>
+                                {"★".repeat(meal.rating || 0)}{"☆".repeat(5 - (meal.rating || 0))}
+                            </div>
                         </div>
 
-                        <h3 style={{ marginBottom: "0.5rem" }}>{meal.name}</h3>
+                        <h3 style={{ marginBottom: "1rem", fontSize: "1.4rem", lineHeight: "1.2" }}>{meal.name}</h3>
 
                         <div style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: "0.85rem",
-                            color: "gray",
-                            marginBottom: "1rem",
-                            borderTop: "1px solid var(--border-light)",
-                            paddingTop: "0.5rem"
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "0.75rem",
+                            fontSize: "0.8rem",
+                            color: "rgba(255,255,255,0.85)",
+                            marginBottom: "1.5rem",
+                            borderTop: "1px solid rgba(255,255,255,0.05)",
+                            paddingTop: "1rem"
                         }}>
-                            <span>{meal.calories} kcal</span>
-                            <span>Prot: {meal.protein}g</span>
-                            <span>Carb: {meal.carbs}g</span>
-                            <span>Fat: {meal.fats}g</span>
+                            <div>🔥 {meal.calories} kcal</div>
+                            <div>💪 Prot: {meal.protein}g</div>
+                            <div>🍞 Carb: {meal.carbs}g</div>
+                            <div>🥑 Fat: {meal.fats}g</div>
                         </div>
 
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "2rem" }}>
                             {meal.tags.split(",").map((tag: string) => (
                                 <span key={tag} style={{
-                                    fontSize: "0.75rem",
-                                    color: "var(--foreground)",
-                                    opacity: 0.7
+                                    fontSize: "0.7rem",
+                                    color: "var(--accent)",
+                                    background: "rgba(6, 182, 212, 0.05)",
+                                    padding: "0.2rem 0.6rem",
+                                    borderRadius: "var(--radius-full)",
+                                    border: "1px solid rgba(6, 182, 212, 0.1)"
                                 }}>
-                                    #{tag.trim()}
+                                    {tag.trim()}
                                 </span>
                             ))}
                         </div>
@@ -129,9 +140,9 @@ export default function MealLibrary({ initialMeals }: MealLibraryProps) {
                         <button
                             onClick={() => setSelectedMeal(meal)}
                             className="btn-secondary"
-                            style={{ marginTop: "auto", width: "100%" }}
+                            style={{ marginTop: "auto", width: "100%", fontSize: "0.9rem" }}
                         >
-                            View Details
+                            Open Dossier
                         </button>
                     </div>
                 ))}

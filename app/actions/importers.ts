@@ -6,16 +6,21 @@ import { revalidatePath } from "next/cache";
 
 export async function importRecipe(input: string) {
   const dbIngredients = await prisma.ingredient.findMany();
+  const exclusions = (await prisma.appSetting.findUnique({ where: { key: "exclusions" } }))?.value || "None";
+
   const systemPrompt = `
     You are an expert chef and nutritionist. Extract a recipe from the provided text or URL.
     
+    STRICT INGREDIENT EXCLUSIONS: ${exclusions}.
+    If the source text contains any of these ingredients, SWAP them for a suitable healthy alternative if possible, or omit them.
+    
     Use this ingredient pricing context to estimate costs (ZAR):
-    ${JSON.stringify(dbIngredients.map(i => ({ name: i.name, price: i.price, unit: i.unit })))}
+    ${JSON.stringify(dbIngredients.slice(0, 150).map(i => ({ name: i.name, price: i.price, unit: i.unit })))}
     
     Return ONLY a JSON object with the following structure:
     {
       "name": "Recipe Name",
-      "instructions": "Step by step instructions",
+      "instructions": "Detailed, numbered step-by-step Execution Protocol (including prep, cooking, and temperature settings). Mention if any restricted ingredients were swapped.",
       "ingredients": [
         {"item": "ingredient name", "amount": "quantity", "cost": 0.0}
       ],

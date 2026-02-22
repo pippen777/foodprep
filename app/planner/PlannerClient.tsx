@@ -60,41 +60,71 @@ export default function PlannerClient({ meals, dietMode }: PlannerClientProps) {
     const totalWeeklyCost = weeklyPlan.reduce((sum, day) => sum + day.totalCost, 0);
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "2rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "3rem", padding: "1rem" }}>
             {/* Sidebar: Meal Library */}
-            <div style={{ position: "sticky", top: "100px", height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: "1rem" }}>
-                <h3 style={{ marginBottom: "1rem" }}>Meal Library</h3>
-                <input
-                    type="text"
-                    placeholder="Filter library..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{ width: "100%", padding: "0.8rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", marginBottom: "1rem" }}
-                />
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
+            <div style={{
+                position: "sticky",
+                top: "100px",
+                height: "calc(100vh - 150px)",
+                overflowY: "auto",
+                padding: "2rem",
+                background: "rgba(255,255,255,0.02)",
+                borderRadius: "var(--radius-lg)",
+                border: "1px solid rgba(255,255,255,0.05)",
+                scrollbarWidth: "none"
+            }}>
+                <h3 style={{ marginBottom: "1.5rem", fontSize: "1.5rem" }}>Culinary Archives</h3>
+                <div style={{ position: "relative", marginBottom: "1rem" }}>
+                    <input
+                        type="text"
+                        placeholder="Search recipes..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={{ width: "100%", paddingLeft: "1rem" }}
+                    />
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "2rem" }}>
                     {filters.map(f => (
-                        <button key={f} onClick={() => setActiveFilter(f)} className={activeFilter === f ? "btn-primary" : "btn-secondary"} style={{ fontSize: "0.7rem", padding: "0.3rem 0.6rem" }}>
+                        <button
+                            key={f}
+                            onClick={() => setActiveFilter(f)}
+                            className={activeFilter === f ? "btn-primary" : "btn-secondary"}
+                            style={{ fontSize: "0.75rem", padding: "0.4rem 0.8rem" }}
+                        >
                             {f}
                         </button>
                     ))}
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     {filteredLibrary.map(meal => (
                         <div
                             key={meal.id}
-                            className="card"
+                            className="glass-card"
                             style={{
-                                padding: "1rem",
+                                padding: "1.25rem",
                                 cursor: selectedSlot ? "pointer" : "default",
-                                border: selectedSlot ? "1px dashed var(--primary)" : undefined,
-                                opacity: selectedSlot ? 1 : 0.8
+                                border: selectedSlot ? "1px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)",
+                                background: selectedSlot ? "rgba(59, 130, 246, 0.1)" : undefined,
+                                transition: "all 0.2s ease"
                             }}
                             onClick={() => selectedSlot && handleSelectMeal(meal)}
                         >
-                            <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{meal.name}</div>
-                            <div style={{ fontSize: "0.8rem", color: "gray" }}>R{meal.cost} | {meal.tags}</div>
-                            {selectedSlot && <div style={{ fontSize: "0.7rem", color: "var(--primary)", marginTop: "0.5rem", fontWeight: "bold" }}>Click to Add</div>}
+                            <div style={{ fontWeight: "700", fontSize: "1rem", marginBottom: "0.4rem" }}>{meal.name}</div>
+                            <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>
+                                <span style={{ color: "var(--success)" }}>R{meal.cost}</span> • {meal.tags.split(',')[0]}
+                            </div>
+                            {selectedSlot && (
+                                <div style={{
+                                    fontSize: "0.75rem",
+                                    color: "var(--primary)",
+                                    marginTop: "0.75rem",
+                                    fontWeight: "800",
+                                    textTransform: "uppercase"
+                                }}>
+                                    ✨ Click to Assign
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -102,47 +132,63 @@ export default function PlannerClient({ meals, dietMode }: PlannerClientProps) {
 
             {/* Main Content: The Week */}
             <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-                    <h2>Weekly Menu Builder</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "3rem" }}>
+                    <div>
+                        <h2 style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>Global Weekly Build</h2>
+                        <p style={{ color: "rgba(255,255,255,0.5)" }}>Strategic meal allocation for the coming cycle.</p>
+                    </div>
                     <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "1.2rem", fontWeight: "700" }}>Weekly Total: R{totalWeeklyCost.toFixed(2)}</div>
-                        <button onClick={handleSave} className="btn-primary" style={{ marginTop: "0.5rem" }}>Save Plan to History</button>
+                        <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Projected Total</div>
+                        <div style={{ fontSize: "2.5rem", fontWeight: "900", color: "var(--success)" }}>R{totalWeeklyCost.toFixed(2)}</div>
+                        <button onClick={handleSave} className="btn-primary" style={{ marginTop: "1rem", width: "100%" }}>Finalize Plan</button>
                     </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                     {weeklyPlan.map((day) => (
-                        <div key={day.day} className="card" style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 1fr 100px", gap: "1rem", alignItems: "center", padding: "1.5rem" }}>
-                            <div style={{ fontWeight: "800", color: "var(--primary)" }}>DAY {day.day}</div>
+                        <div key={day.day} className="glass-card" style={{
+                            display: "grid",
+                            gridTemplateColumns: "120px 1fr 1fr 1fr 120px",
+                            gap: "1.5rem",
+                            alignItems: "center",
+                            padding: "2rem"
+                        }}>
+                            <div style={{ textAlign: "center" }}>
+                                <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>Session</div>
+                                <div style={{ fontWeight: "900", color: "var(--primary)", fontSize: "1.5rem" }}>D-{day.day}</div>
+                            </div>
 
                             {["breakfast", "lunch", "dinner"].map(type => (
                                 <div
                                     key={type}
                                     onClick={() => setSelectedSlot({ day: day.day, type })}
                                     style={{
-                                        padding: "1rem",
-                                        borderRadius: "var(--radius-sm)",
-                                        border: selectedSlot?.day === day.day && selectedSlot?.type === type ? "2px solid var(--primary)" : "1px solid var(--border-light)",
-                                        backgroundColor: day[type] ? "var(--surface-secondary)" : "transparent",
+                                        padding: "1.5rem",
+                                        borderRadius: "var(--radius-md)",
+                                        border: selectedSlot?.day === day.day && selectedSlot?.type === type ? "2px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)",
+                                        background: day[type] ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.2)",
                                         cursor: "pointer",
                                         textAlign: "center",
-                                        minHeight: "80px",
+                                        minHeight: "100px",
                                         display: "flex",
                                         flexDirection: "column",
-                                        justifyContent: "center"
+                                        justifyContent: "center",
+                                        transition: "all 0.2s ease",
+                                        boxShadow: selectedSlot?.day === day.day && selectedSlot?.type === type ? "0 0 20px rgba(59, 130, 246, 0.3)" : "none"
                                     }}
                                 >
-                                    <div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "gray", marginBottom: "0.25rem" }}>{type}</div>
+                                    <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: "0.5rem", letterSpacing: "1px" }}>{type}</div>
                                     {day[type] ? (
-                                        <div style={{ fontWeight: "600", fontSize: "0.85rem" }}>{day[type].name}</div>
+                                        <div style={{ fontWeight: "700", fontSize: "0.95rem", color: "white" }}>{day[type].name}</div>
                                     ) : (
-                                        <div style={{ fontSize: "0.8rem", color: "#ccc" }}>+ Select</div>
+                                        <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.2)" }}>+ Assign</div>
                                     )}
                                 </div>
                             ))}
 
-                            <div style={{ textAlign: "right", fontWeight: "700", fontSize: "0.9rem" }}>
-                                R{day.totalCost.toFixed(2)}
+                            <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>Day Cost</div>
+                                <div style={{ fontWeight: "800", fontSize: "1.2rem", color: "white" }}>R{day.totalCost.toFixed(2)}</div>
                             </div>
                         </div>
                     ))}

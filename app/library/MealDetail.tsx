@@ -89,36 +89,55 @@ export default function MealDetail({ meal, onClose, onSaveSuccess }: MealDetailP
     };
 
     return (
-        <div className="flex-center" style={{
+        <div style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            backdropFilter: "blur(5px)",
+            backgroundColor: "var(--surface-dark)",
+            backdropFilter: "blur(12px)",
             zIndex: 1000,
-            padding: "1rem"
+            padding: "2rem",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center"
         }}>
-            <div className="card" style={{
-                maxWidth: "800px",
+            <div className="glass-card" style={{
+                maxWidth: "900px",
                 width: "100%",
-                maxHeight: "90vh",
+                maxHeight: "85vh",
                 overflowY: "auto",
-                position: "relative"
+                position: "relative",
+                padding: "3rem",
+                boxShadow: "0 0 100px rgba(59, 130, 246, 0.1)",
+                margin: "auto"
             }}>
                 <button onClick={onClose} style={{
                     position: "absolute",
-                    top: "1rem",
-                    right: "1rem",
-                    fontSize: "1.5rem"
+                    top: "1.5rem",
+                    right: "1.5rem",
+                    fontSize: "2rem",
+                    color: "rgba(255,255,255,0.4)",
+                    lineHeight: 1,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer"
                 }}>&times;</button>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                    <h2>Edit Meal</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2.5rem" }}>
+                    <h2 style={{ fontSize: "2.5rem", margin: 0 }}>Meal Dossier</h2>
                     <div style={{ display: "flex", gap: "0.25rem" }}>
                         {[1, 2, 3, 4, 5].map((star) => (
                             <button
                                 key={star}
                                 onClick={() => setRating(star)}
-                                style={{ fontSize: "1.5rem", color: star <= rating ? "#FFD700" : "#D2D2D7" }}
+                                style={{
+                                    fontSize: "2rem",
+                                    color: star <= rating ? "#f59e0b" : "rgba(255,255,255,0.1)",
+                                    filter: star <= rating ? "drop-shadow(0 0 5px rgba(245, 158, 11, 0.5))" : "none",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    WebkitTextFillColor: "initial"
+                                }}
                             >
                                 ★
                             </button>
@@ -126,120 +145,111 @@ export default function MealDetail({ meal, onClose, onSaveSuccess }: MealDetailP
                     </div>
                 </div>
 
-                <div style={{ marginBottom: "1.5rem" }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Meal Name</label>
+                <div style={{ marginBottom: "2rem" }}>
+                    <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.9rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "1px" }}>Identification</label>
                     <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         style={{
                             width: "100%",
-                            padding: "0.75rem",
-                            borderRadius: "var(--radius-sm)",
-                            border: "1px solid var(--border)",
-                            fontSize: "1.2rem"
+                            fontSize: "1.5rem",
+                            fontWeight: "700"
                         }}
                     />
                 </div>
 
-                <div style={{ marginBottom: "1.5rem" }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Ingredients</label>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ marginBottom: "2rem" }}>
+                    <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.9rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "1px" }}>Resource List (Ingredients)</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                         {ingredients.map((ing, index) => (
-                            <div key={index} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                            <div key={index} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
                                 <input
                                     type="text"
                                     placeholder="Item"
                                     value={ing.item}
                                     onChange={(e) => updateIngredient(index, "item", e.target.value)}
-                                    style={{ flex: 2, padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
+                                    style={{ flex: 2 }}
                                 />
                                 <input
                                     type="text"
                                     placeholder="Amount"
                                     value={ing.amount}
                                     onChange={(e) => updateIngredient(index, "amount", e.target.value)}
-                                    style={{ flex: 1, padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
+                                    style={{ flex: 1 }}
                                 />
-                                <input
-                                    type="number"
-                                    placeholder="Cost"
-                                    value={ing.cost}
-                                    step="0.01"
-                                    onChange={(e) => updateIngredient(index, "cost", parseFloat(e.target.value) || 0)}
-                                    style={{ width: "80px", padding: "0.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
-                                />
-                                <button onClick={() => removeIngredient(index)} style={{ color: "var(--error)", fontSize: "1.2rem" }}>
+                                <div style={{ position: "relative" }}>
+                                    <span style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--success)", fontSize: "0.8rem" }}>R</span>
+                                    <input
+                                        type="number"
+                                        placeholder="Cost"
+                                        value={ing.cost}
+                                        step="0.01"
+                                        onChange={(e) => updateIngredient(index, "cost", parseFloat(e.target.value) || 0)}
+                                        style={{ width: "100px", paddingLeft: "1.8rem" }}
+                                    />
+                                </div>
+                                <button onClick={() => removeIngredient(index)} style={{ color: "var(--error)", opacity: 0.6 }}>
                                     🗑️
                                 </button>
                             </div>
                         ))}
-                        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
                             <button
                                 onClick={addIngredient}
                                 className="btn-secondary"
-                                style={{ fontSize: "0.85rem" }}
+                                style={{ fontSize: "0.9rem", padding: "0.75rem 1.5rem" }}
                             >
-                                + Add Ingredient
+                                + Add Row
                             </button>
                             <button
                                 onClick={handleRecalculate}
                                 disabled={calculating}
                                 className="btn-secondary"
-                                style={{ fontSize: "0.85rem", color: "var(--primary)", borderColor: "var(--primary)" }}
+                                style={{ fontSize: "0.9rem", padding: "0.75rem 1.5rem", color: "var(--primary)", borderColor: "var(--primary)" }}
                             >
-                                {calculating ? "Calculating..." : "✨ Auto-Calculate Costs"}
+                                {calculating ? "Processing Quantum..." : "✨ Calculate Cosmos Cost"}
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div style={{ marginBottom: "1.5rem" }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Chef's Notes</label>
-                    <div style={{ fontSize: "0.85rem", color: "gray", marginBottom: "0.5rem" }}>
-                        Leave notes for the AI to refine future suggestions.
-                    </div>
+                <div style={{ marginBottom: "2rem" }}>
+                    <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.9rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "1px" }}>Chef's Intelligence Hub</label>
                     <textarea
                         value={chefNotes}
                         onChange={(e) => setChefNotes(e.target.value)}
-                        placeholder="e.g. 'The kids loved this, but use less chili next time.'"
+                        placeholder="Feedback for the AI loop..."
                         style={{
                             width: "100%",
-                            height: "80px",
-                            padding: "0.75rem",
-                            borderRadius: "var(--radius-sm)",
-                            border: "1px solid var(--border)",
-                            fontFamily: "inherit",
-                            fontStyle: "italic"
+                            height: "100px",
+                            fontStyle: "italic",
+                            fontSize: "1rem"
                         }}
                     />
                 </div>
 
-                <div style={{ marginBottom: "2rem" }}>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Instructions</label>
+                <div style={{ marginBottom: "3rem" }}>
+                    <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.9rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "1px" }}>Execution Protocol (Instructions)</label>
                     <textarea
                         value={instructions}
                         onChange={(e) => setInstructions(e.target.value)}
                         style={{
                             width: "100%",
-                            minHeight: "150px",
-                            padding: "0.75rem",
-                            borderRadius: "var(--radius-sm)",
-                            border: "1px solid var(--border)",
-                            fontFamily: "inherit"
+                            minHeight: "200px"
                         }}
                     />
                 </div>
 
-                <div style={{ display: "flex", gap: "1rem", marginTop: "2rem" }}>
-                    {!meal.id.startsWith("mock-") && (
+                <div style={{ display: "flex", gap: "1.5rem", marginTop: "3rem", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "2rem" }}>
+                    {!meal.id.startsWith("mock-") && !meal.id.startsWith("temp-") && (
                         <button
                             onClick={handleDelete}
                             disabled={saving}
                             className="btn-secondary"
-                            style={{ color: "var(--error)", borderColor: "var(--error-light)", flex: 0.5 }}
+                            style={{ color: "var(--error)", borderColor: "rgba(239, 68, 68, 0.2)", flex: 0.5 }}
                         >
-                            Delete
+                            Trash Protocol
                         </button>
                     )}
                     <button
@@ -247,15 +257,15 @@ export default function MealDetail({ meal, onClose, onSaveSuccess }: MealDetailP
                         className="btn-secondary"
                         style={{ flex: 1 }}
                     >
-                        Cancel
+                        Close
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
                         className="btn-primary"
-                        style={{ flex: 1.5 }}
+                        style={{ flex: 1.5, fontSize: "1.1rem" }}
                     >
-                        {saving ? "Processing..." : "Save Changes"}
+                        {saving ? "Storing Pulse..." : "Sync to Library"}
                     </button>
                 </div>
             </div>
