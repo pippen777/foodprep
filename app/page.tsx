@@ -1,22 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { generateWeeklyPlan, surpriseMe, getLatestMealPlan, deleteMealPlan, updateMealPlan } from "@/app/actions/ai";
 import Link from "next/link";
 import MealDetail from "./library/MealDetail";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState("");
-  const [fullPlan, setFullPlan] = useState<any>(null); // Stores the full DB object
+  const [fullPlan, setFullPlan] = useState<any>(null);
   const [activeDossier, setActiveDossier] = useState<any>(null);
   const [surprisedMeal, setSurprisedMeal] = useState<any>(null);
   const [message, setMessage] = useState("");
   const [showShoppingList, setShowShoppingList] = useState(false);
 
+  // Mission Control State
+  const [missionLogs, setMissionLogs] = useState<string[]>([]);
+  const [progress, setProgress] = useState(0);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadPlan();
   }, []);
+
+  useEffect(() => {
+    if (logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [missionLogs]);
 
   async function loadPlan() {
     const latest = await getLatestMealPlan();
@@ -27,42 +37,64 @@ export default function Dashboard() {
     }
   }
 
+  const addLog = (text: string) => {
+    setMissionLogs(prev => [...prev, `[${new Date().toLocaleTimeString([], { hour12: false, second: '2-digit', minute: '2-digit' })}] ${text}`]);
+  };
+
   const handleGenerate = async (type: "lunch" | "dinner" | "all" = "all") => {
     setLoading(true);
     setMessage("");
-    setLoadingStep("Initiating deep-space scan...");
+    setMissionLogs([]);
+    setProgress(0);
 
-    const steps = [
-      "Optimizing nutrient paths...",
-      "Consulting culinary nodes library...",
-      "Prioritizing your favorite meals...",
-      "Syncing with ZAR budget cores...",
-      "Compiling logistics manifest..."
+    const stages = [
+      { msg: "Handshaking with OpenRouter Neural Core...", progress: 5, delay: 500 },
+      { msg: "Accessing Food Crib Library (SQLite Payload Sent)...", progress: 15, delay: 1500 },
+      { msg: "Applying South African Budget Context (R400/day constraint)...", progress: 25, delay: 3000 },
+      { msg: "Optimizing Nutrient Paths for 7-Day Cycle...", progress: 40, delay: 6000 },
+      { msg: "Primary Model (Gemma-3) Thinking...", progress: 55, delay: 10000 },
+      { msg: "Scanning for Hallucinations & Ghost Recipes...", progress: 70, delay: 20000 },
+      { msg: "Compiling Logistics Manifest & Hydrating JSON Data...", progress: 85, delay: 30000 },
+      { msg: "Finalizing Deployment Manifest...", progress: 95, delay: 38000 },
     ];
 
-    let stepIdx = 0;
-    const interval = setInterval(() => {
-      if (stepIdx < steps.length) {
-        setLoadingStep(steps[stepIdx]);
-        stepIdx++;
-      }
-    }, 4000);
+    addLog(`INITIATING ${type.toUpperCase()} DEPLOYMENT...`);
+
+    // Simulate steps in parallel with the actual call
+    stages.forEach(s => {
+      setTimeout(() => {
+        if (loading) {
+          addLog(s.msg);
+          setProgress(s.progress);
+        }
+      }, s.delay);
+    });
+
+    // Detect if primary fails (around 40s)
+    const fallbackTimer = setTimeout(() => {
+      addLog("WARNING: Primary Node Choking. Activating Fallback Layer 1 (Trinity Mini)...");
+    }, 40500);
 
     try {
       const res = await generateWeeklyPlan(7, type);
-      clearInterval(interval);
+      clearTimeout(fallbackTimer);
+
       if (res.success) {
+        setProgress(100);
+        addLog("DEPLOYMENT SUCCESSFUL. WRITING TO HISTORY...");
         await loadPlan();
+        setTimeout(() => setLoading(false), 1000);
         setMessage(`${type === 'all' ? '7-Day' : type.charAt(0).toUpperCase() + type.slice(1)} Meal Plan generated successfully!`);
       } else {
+        addLog(`CRITICAL ERROR: ${res.error}`);
+        setTimeout(() => setLoading(false), 2000);
         setMessage("Error: " + res.error);
       }
     } catch (e) {
-      clearInterval(interval);
+      clearTimeout(fallbackTimer);
+      addLog("SYSTEM FAILURE: DEPLOYMENT INTERRUPTED.");
+      setTimeout(() => setLoading(false), 2000);
       setMessage("System Failure: Deployment failed.");
-    } finally {
-      setLoading(false);
-      setLoadingStep("");
     }
   };
 
@@ -77,21 +109,15 @@ export default function Dashboard() {
   const removeMealFromPlan = async (dayIdx: number, type: 'lunch' | 'dinner') => {
     const newMeals = [...fullPlan.meals.meals];
     newMeals[dayIdx][type] = null;
-
-    // Recalculate total cost
     const totalWeeklyCost = newMeals.reduce((sum: number, day: any) => sum + (day.totalCost || 0), 0);
-
     await updateMealPlan(fullPlan.id, newMeals, fullPlan.meals.shoppingList, totalWeeklyCost);
     await loadPlan();
   };
 
   const handleSurprise = async () => {
     const meal = await surpriseMe();
-    if (meal) {
-      setSurprisedMeal(meal);
-    } else {
-      setMessage("No meals in library yet. Add some first!");
-    }
+    if (meal) setSurprisedMeal(meal);
+    else setMessage("No meals in library yet.");
   };
 
   const openDossier = (meal: any) => {
@@ -108,6 +134,71 @@ export default function Dashboard() {
 
   return (
     <div style={{ padding: "4rem 2rem", maxWidth: "1200px", margin: "0 auto" }}>
+      {/* AI Generate Overlay */}
+      {loading && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(2, 6, 23, 0.98)",
+          backdropFilter: "blur(20px)",
+          zIndex: 2000,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "2rem"
+        }}>
+          <div style={{ maxWidth: "600px", width: "100%", textAlign: "center" }}>
+            <h2 style={{ fontSize: "2.5rem", marginBottom: "2rem", color: "var(--primary)" }}>Mission Control</h2>
+
+            {/* Progress Bar Container */}
+            <div style={{
+              width: "100%",
+              height: "12px",
+              background: "rgba(255,255,255,0.05)",
+              borderRadius: "20px",
+              marginBottom: "2rem",
+              overflow: "hidden",
+              border: "1px solid rgba(255,255,255,0.1)"
+            }}>
+              <div style={{
+                width: `${progress}%`,
+                height: "100%",
+                background: "linear-gradient(to right, var(--primary), var(--accent))",
+                transition: "width 1s cubic-bezier(0.23, 1, 0.32, 1)",
+                boxShadow: "0 0 20px var(--primary-glow)"
+              }}></div>
+            </div>
+
+            {/* Terminal Window */}
+            <div style={{
+              height: "300px",
+              background: "rgba(0,0,0,0.4)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "12px",
+              padding: "1.5rem",
+              textAlign: "left",
+              fontFamily: "monospace",
+              fontSize: "0.9rem",
+              overflowY: "auto",
+              color: "#10b981",
+              boxShadow: "inset 0 0 20px rgba(0,0,0,0.5)"
+            }}>
+              {missionLogs.map((log, i) => (
+                <div key={i} style={{ marginBottom: "0.5rem", borderLeft: "2px solid #10b981", paddingLeft: "1rem" }}>
+                  {log}
+                </div>
+              ))}
+              <div ref={logEndRef} />
+            </div>
+
+            <p style={{ marginTop: "2rem", color: "rgba(255,255,255,0.4)", fontSize: "0.9rem" }}>
+              Please standby. Large plans can take up to 2 minutes when nodes are saturated.
+            </p>
+          </div>
+        </div>
+      )}
+
       <header style={{ marginBottom: "6rem", textAlign: "center" }}>
         <h1 style={{ fontSize: "5rem", fontWeight: "900", marginBottom: "1.5rem", lineHeight: 1.1 }}>
           The Future of <br />
@@ -137,12 +228,7 @@ export default function Dashboard() {
               className="btn-primary"
               style={{ width: "100%", padding: "1.5rem", fontSize: "1.2rem", position: "relative", overflow: "hidden" }}
             >
-              {loading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem" }}>
-                  <div className="spinner-small"></div>
-                  <span>{loadingStep}</span>
-                </div>
-              ) : "🚀 Generate Full 7-Day Plan"}
+              🚀 Generate Full 7-Day Plan
             </button>
             <div style={{ display: "flex", gap: "1rem" }}>
               <button
@@ -270,7 +356,7 @@ export default function Dashboard() {
               inset: 0,
               backgroundColor: "var(--surface-dark)",
               backdropFilter: "blur(12px)",
-              zIndex: 1100,
+              zIndex: 3000,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
